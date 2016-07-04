@@ -104,13 +104,13 @@ void sr_insertion_sort(struct sr_nodes **head_ref)
     while (current_h != NULL){
       
         // Store next for next iteration
-        struct sr_nodes *next = list_item_next(current_h);
+        struct sr_nodes *next_h = list_item_next(current_h);
 
         // insert current in sorted linked list
         sr_sorted_insert(&sorted, current_h);
 	
         // Update current
-        current_h = next;
+        current_h = next_h;
     }
 
     // Update head_ref to point to sorted linked list

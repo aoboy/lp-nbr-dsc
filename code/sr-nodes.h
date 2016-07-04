@@ -2,8 +2,12 @@
 
 
 
+#ifndef SR_NODES_H
+#define SR_NODES_H
+
 #include "contiki.h"
 #include "lib/random.h"
+#include "lib/list.h"
 #include "net/linkaddr.h"
 
 
@@ -28,7 +32,7 @@ static uint8_t num_neighbors = CONF_NETWORK_SIZE;
 #endif //CONF_NETWORK_SIZE
 
 #else //CONF_NETWORK_SIZE != 0
-error "network size unspecified"
+#error "network size unspecified"
 #endif //CONF_NETWORK_SIZE != 0
 //=========================================================================//
 typedef struct{
@@ -39,7 +43,11 @@ typedef struct{
 }sr_packet_t;
 
 #define SR_PACKET_LEN sizeof(sr_packet_t)
-#define SR_SL_PKT_HDR_LEN 4
+#define SR_PACKET_HDR_LEN (SR_PACKET_LEN - NETWORK_PAYLOAD_SIZE)
+//=========================================================================//
+struct hash_table_t{
+    LIST_STRUCT(node);
+};
 //=========================================================================//
 struct sr_nodes{
    struct sr_nodes *next;
@@ -47,6 +55,7 @@ struct sr_nodes{
    uint8_t hopc;
    uint8_t period_len;
    uint8_t offset;
+   uint8_t offset_0;
    uint8_t tmp_div;
    uint8_t spat_sim;
    uint16_t slot_gain;
@@ -55,8 +64,17 @@ struct sr_nodes{
    struct ctimer nbr_timer; //update nbr offset
 };
 //=========================================================================//
+struct sr_gains{
+  linkaddr_t addr;
+  uint8_t offset;
+  uint16_t gains;
+  //struct sr_gains *next;
+};
+//=========================================================================//
 enum{
   SR_SL_ANCHOR    = 0x11,
   SR_SL_PROBE     = 0x12
 };
 //=========================================================================//
+
+#endif SR_NODES_H
