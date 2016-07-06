@@ -68,7 +68,7 @@ struct sr_gains{
   linkaddr_t addr;
   uint8_t offset;
   uint16_t gains;
-  //struct sr_gains *next;
+  struct sr_gains *next;
 };
 //=========================================================================//
 enum{

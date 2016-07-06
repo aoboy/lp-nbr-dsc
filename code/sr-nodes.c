@@ -20,6 +20,7 @@
 #include "node-id.h"
 
 //#include "./dnde-neigh-G.h"
+#include "./sr-sort.h"
 #include "./sr-nodes.h"
 
 ///=========================================================================/
@@ -45,22 +46,24 @@ volatile char *cooja_debug_ptr;
 
 ///=========================================================================/
 ///=========================================================================/
-//LIST(srnodes_list);
-/*#if CONF_NETWORK_SIZE != 0
-MEMB(srnodes_memb, struct sr_nodes, CONF_NETWORK_SIZE);
-#else //#if CONF_NETWORK_SIZE != 0
-MEMB(srnodes_memb, struct sr_nodes, 2);
-#endif //#if CONF_NETWORK_SIZE != 0*/
 
+///=========================================================================/
 #define HASH_TABLE_SIZE 13
 static struct hash_table_t hash_table[CONF_NETWORK_SIZE];
 MEMB(srnodes_memb, struct sr_nodes, CONF_NETWORK_SIZE);
 ///=========================================================================/
 ///=========================================================================/
+LIST(srgains_list);
+MEMB(srgains_memb, struct sr_gains, CONF_NETWORK_SIZE);
+///=========================================================================/
 void sr_nodes_init(){
   uint8_t k;
 
-  //list_init(srnodes_list);
+  list_init(srgains_list);
+  memb_init(&srgains_memb);
+  
+  
+  //now for the hash table..
   memb_init(&srnodes_memb);
 
   for(k = 0; k < HASH_TABLE_SIZE; k++){
@@ -148,6 +151,50 @@ void sr_nodes_flush(){
     }
     //add self
     sr_node_addself();
+}
+///=========================================================================/
+///=========================================================================/
+static void sr_nodes_update(struct sr_gains *node){
+
+  struct sr_nodes* res = sr_nodes_get(&node->addr);
+  
+  if(res != NULL){
+      node->gains  = res->slot_gain;
+      node->offset = res->offset;
+  }
+}
+
+///=========================================================================/
+///=========================================================================/
+uint8_t 
+is_there_anchor(uint8_t topK_slots, uint16_t curr_time, uint8_t update_var){
+  /**1. update offsets and gains
+     2. sort gains
+     3. extract the K leading gains
+     4. 
+   */
+  if(update_var){
+     //1. update offsets and gains here..
+     struct sr_gains *ul_ptr = list_head(srgains_list);
+     for(; ul_ptr != NULL; ul_ptr = list_item_next(ul_ptr)){
+	  sr_nodes_update(ul_ptr);
+     }
+    
+     //2. sort the gains here
+     struct sr_gains *hlist = list_head(srgains_list);
+     
+     sr_insertion_sort(&hlist);
+  }
+  
+  uint8_t k_max = 0;
+  struct sr_gains *hptr = list_head(srgains_list);
+  
+  for(; (hptr != NULL) && (k_max < topK_slots); hptr=list_item_next(hptr)){
+    
+     uint16_t time_anchor = sr_nodes_time_anchor(hptr);
+  } 
+  
+  
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -258,6 +305,7 @@ uint8_t sr_nodes_add_data(uint8_t *data_ptr, uint8_t offset){
   
   for(key = 0; key < HASH_TABLE_SIZE; key++){
       uint8_t exit_loop = 0;
+      
       lst_ptr = list_head(&hash_table[key].node_list);
 
       while(lst_ptr != NULL){

@@ -4,9 +4,9 @@
 
 #include "./sr-nodes.h"
 
-struct sr_nodes *sr_mergesort(struct sr_nodes *head);
+struct sr_gains *sr_mergesort(struct sr_gains *head);
 
-void sr_insertion_sort(struct sr_nodes **head_ref);
+void sr_insertion_sort(struct sr_gains **head_ref);
 
 
 

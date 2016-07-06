@@ -14,9 +14,9 @@
  * @param head_two
  * @return
  */
-static struct sr_nodes*
-sr_merge(struct sr_nodes *head_one, struct sr_nodes *head_two) {
-    struct sr_nodes *head_three;
+static struct sr_gains*
+sr_merge(struct sr_gains *head_one, struct sr_gains *head_two) {
+    struct sr_gains *head_three;
 
     if(head_one == NULL)
         return head_two;
@@ -24,7 +24,7 @@ sr_merge(struct sr_nodes *head_one, struct sr_nodes *head_two) {
     if(head_two == NULL)
         return head_one;
 
-    if(head_one->slot_gain > head_two->slot_gain) {
+    if(head_one->gains > head_two->gains) {
         head_three = head_one;
         head_three->next = sr_merge(head_one->next, head_two);
     } else {
@@ -37,9 +37,9 @@ sr_merge(struct sr_nodes *head_one, struct sr_nodes *head_two) {
 
 ///=========================================================================/
 /* preform merge sort on the linked list */
-struct sr_nodes *sr_mergesort(struct sr_nodes *head) {
-    struct sr_nodes  *head_one;
-    struct sr_nodes  *head_two;
+struct sr_gains *sr_mergesort(struct sr_gains *head) {
+    struct sr_gains  *head_one;
+    struct sr_gains  *head_two;
 
     if((head == NULL) || (head->next == NULL))
         return head;
@@ -65,10 +65,10 @@ struct sr_nodes *sr_mergesort(struct sr_nodes *head) {
  * @param new_node
  */
 static void 
-sr_sorted_insert(struct sr_nodes** head_ref, struct sr_nodes* new_node){
-    struct sr_nodes* current;
+sr_sorted_insert(struct sr_gains** head_ref, struct sr_gains* new_node){
+    struct sr_gains* current;
     //special case for the head end
-    if (*head_ref == NULL || (*head_ref)->slot_gain < new_node->slot_gain)
+    if (*head_ref == NULL || (*head_ref)->gains < new_node->gains)
     {
         new_node->next = *head_ref;
         *head_ref = new_node;
@@ -76,7 +76,7 @@ sr_sorted_insert(struct sr_nodes** head_ref, struct sr_nodes* new_node){
         //locate the node before the point of insertion
         current = *head_ref;
         while (current->next!=NULL &&
-               current->next->slot_gain > new_node->slot_gain)
+               current->next->gains > new_node->gains)
         {
             current = list_item_next(current); //current->next;
         }
@@ -91,20 +91,20 @@ sr_sorted_insert(struct sr_nodes** head_ref, struct sr_nodes* new_node){
  * @brief insertion_sort
  * @param head_ref
  */
-void sr_insertion_sort(struct sr_nodes **head_ref)
+void sr_insertion_sort(struct sr_gains **head_ref)
 {
     // Initialize sorted linked list
-    struct sr_nodes *sorted = NULL;
+    struct sr_gains *sorted = NULL;
 
     // go through the given linked list and insert every
     // node to sorted
-    struct sr_nodes *current_h = *head_ref;
+    struct sr_gains *current_h = *head_ref;
     
     //watchdog_periodic();
     while (current_h != NULL){
       
         // Store next for next iteration
-        struct sr_nodes *next_h = list_item_next(current_h);
+        struct sr_gains *next_h = list_item_next(current_h);
 
         // insert current in sorted linked list
         sr_sorted_insert(&sorted, current_h);
