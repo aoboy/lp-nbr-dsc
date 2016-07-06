@@ -183,6 +183,7 @@ is_there_anchor(uint8_t topK_slots, uint16_t curr_time, uint8_t update_var){
      //2. sort the gains here
      struct sr_gains *hlist = list_head(srgains_list);
      
+     //call the sorting method here
      sr_insertion_sort(&hlist);
   }
   
@@ -191,10 +192,11 @@ is_there_anchor(uint8_t topK_slots, uint16_t curr_time, uint8_t update_var){
   
   for(; (hptr != NULL) && (k_max < topK_slots); hptr=list_item_next(hptr)){
     
+     //find an entry whose offset is equal to mine.
      uint16_t time_anchor = sr_nodes_time_anchor(hptr);
   } 
   
-  
+  return 0;
 }
 ///=========================================================================/
 ///=========================================================================/
