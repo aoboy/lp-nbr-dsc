@@ -77,7 +77,7 @@ void sr_nodes_init(){
 ///=========================================================================/
 ///=========================================================================/
 uint8_t sr_nodes_get_key(const linkaddr_t *addr){
-    uint16_t key = (addr->u8[1]<< 8)+ addr->u8[0];
+    uint16_t key = (addr->u8[1]<< 8) + addr->u8[0];
     return (uint8_t)((key%HASH_TABLE_SIZE));
 }
 ///=========================================================================/
@@ -131,8 +131,20 @@ static void sr_nodes_addself(){
     }//nself == NULL
 }
 ///=========================================================================/
+static void sr_gains_flush(){
+  
+  struct sr_gains *lg =list_head(srgains_list);
+  
+  while(lg != NULL){	
+      list_remove(srgains_list, lg);
+      memb_remove(&srgains_memb, lg);    
+  }
+  
+  //add self..
+  sr_gains_add(&linkaddr_node_addr, 0, 0);
+}
 ///=========================================================================/
-void sr_nodes_flush(){
+static void sr_nodes_flush(){
     uint8_t key;
     struct sr_nodes *nfls = NULL;
 
@@ -154,7 +166,7 @@ void sr_nodes_flush(){
 }
 ///=========================================================================/
 ///=========================================================================/
-static void sr_nodes_update(struct sr_gains *node){
+static void sr_gains_update(struct sr_gains *node){
 
   struct sr_nodes* res = sr_nodes_get(&node->addr);
   
@@ -177,7 +189,7 @@ is_there_anchor(uint8_t topK_slots, uint16_t curr_time, uint8_t update_var){
      //1. update offsets and gains here..
      struct sr_gains *ul_ptr = list_head(srgains_list);
      for(; ul_ptr != NULL; ul_ptr = list_item_next(ul_ptr)){
-	  sr_nodes_update(ul_ptr);
+	  sr_gains_update(ul_ptr);
      }
     
      //2. sort the gains here
@@ -199,6 +211,32 @@ is_there_anchor(uint8_t topK_slots, uint16_t curr_time, uint8_t update_var){
   return 0;
 }
 ///=========================================================================/
+static void sr_gains_add(linkaddr_t *addr, uint8_t offset, uint16_t gain){
+  struct sr_gains *nnode = list_head(srgains_list);
+  
+  for(; nnode != NULL; nnode = list_item_next(nnode)){
+      if(linkaddr_cmp(nnode->addr, addr)){
+	  //it is an update.. 
+	  nnode->offset = offset;
+	  nnode->gains  = gain;
+	  return;
+      }
+  }//end for loop
+  
+  //create a new list element   
+  nnode = memb_alloc(&srgains_memb);
+  
+  if(nnode != NULL){
+      nnode->gains   = gain;
+      nnode->offset  = offset;
+      nnode->next    = NULL;
+      linkaddr_copy(&nnode->addr, addr);
+      
+      //add new sort element.. 
+      list_add(srgains_list);
+  }
+  
+}
 ///=========================================================================/
 static void sr_nodes_add_nbr(linkaddr_t *src_addr, 
                              uint8_t     offset,
@@ -230,6 +268,7 @@ static void sr_nodes_add_nbr(linkaddr_t *src_addr,
       list_add(&hash_table[key].node_list, novo_nbr);
       
       //set up timer here..
+      
   }
 }
 ///=========================================================================/

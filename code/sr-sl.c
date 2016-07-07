@@ -54,7 +54,7 @@
 #define CCA_SLEEP_TIME                   ((RTIMER_SECOND/200) +1)
 //=========================================================================//
 static volatile uint8_t  radio_is_on_flag                       = 0;
-
+static volatile uint8_t  random_wait_flag			= 0;
 //=========================================================================//
 static volatile uint16_t 		 slot_counter 		= 0;
 static volatile uint16_t                 probe_time   		= 0;
@@ -62,10 +62,16 @@ static volatile uint16_t                 period_length 		= 0;
 static volatile uint16_t                 anchor_time            = 0;
 static volatile uint16_t                 node_slots_offset      = 0;
 static volatile uint16_t 		 discovery_time  	= 0;
+static volatile uint16_t 		 upper_bound_time       = 0;
+static volatile uint16_t		 random_wait_slots      = 0;
 //=========================================================================//
 static volatile uint8_t                  probe_offset           = 0;
 static volatile uint8_t    		 discovery_is_on	= 0;
 static volatile uint8_t    		 num_repetitions        = 0;
+//=========================================================================//
+static volatile uint8_t                  extra_energy_budget    = 0;
+static volatile uint8_t             extra_energy_budget_counter = 0; 
+
 //=========================================================================//
 static struct pt pt;
 static struct rtimer generic_timer;
@@ -74,21 +80,51 @@ static struct rtimer generic_timer;
 #define PERIODS_VEC_SIZE 4
 static const uint8_t duty_cycles[]={1,1,2,3,5};
 static const uint8_t periods_vec[]={200, 167, 133, 100};
+
+#if EXTRA_ENERGY != 0
+static const uint8_t extra_energy = EXTRA_ENERGY;
+#else // EXTRA_ENERGY
+static const uint8_t extra_energy = 5; //in case not defined,.. we use 5%
+#endif // EXTRA_ENERGY
+static volatile uint8_t 		 extra_energy_budget   = 0;
+static volatile uint8_t 	 extra_energy_budget_counter   = 0;
+
+static volatile uint16_t 		      upper_bound_time = 0;
 //=========================================================================//
 #define GROUP_MERGE_TIME 10233
 static uint8_t i3e154_channels[]  ={11,15,20,25,26};
 
-
-
+//=========================================================================//
+//=========================================================================//
 PROCESS(mainloop_process, "SR-SL Main Loop Process");
 PROCESS(output_process,   "Output Process");
+//=========================================================================//
+//=========================================================================//
+
+
+//=========================================================================//
+static uint16_t divide_round(const uint16_t n, const uint16_t d){
+    return ((n+d/2)/d);
+}
+//=========================================================================//
+static void set_protocol_parameters(){
+  //set period period length
+  period_length = periods_vec[random_rand()%PERIODS_VEC_SIZE];
+  
+  //set upper time , i.e, total running time..
+  upper_bound_time = (period_length*period_length)/4;
+  
+}
 
 //=========================================================================//
 void sr_sl_update_nbr(void* nbr_tgt){
   
 }
 //=========================================================================//
-static void sr_sl_send_probe(void *ptr){
+static void sr_sl_send_probe(){
+  
+     
+  
   
 }
 
@@ -112,13 +148,81 @@ sr_sl_schedule_fixed(struct rtimer *sch_rt, rtimer_clock_t next_time){
 //=========================================================================//
 static char sr_sl_pcycle(struct rtimer *pc_prt, void*  dptr){
 
-      PT_BEGIN(&pc_pt);
-
+      PT_BEGIN(&pt);
       
-      PT_END(&pc_pt);
+      while(1){
+
+	  if(random_wait_flag){
+	     while(slot_counter < random_wait_slots){
+		  //acquire time... 
+		  rtimer_clock_t tnow_wait = RTIMER_NOW();
+		  
+		  //increment counter.. 
+		  slot_counter++;
+		  
+		  sr_sl_schedule_fixed(pc_prt, tnow_wait + TS_LEN);
+		  
+		  PT_YIELD(&pt);
+	     }
+	     
+	     //random period is over.. 
+	     random_wait_flag   = 0;
+	    COOJA_DEBUG_PRINTF("Random period end..%u\n", random_wait_slots); 
+	  }
+	  
+	  for(slot_counter = 0; slot_counter < XXX; slot_counter++){
+	       //which slot are we in inside a period
+	       probe_offset = (slot_counter % period_length);
+	       
+	       if((slot_counter%period_length) == 0){
+		 
+		    //increment position of the probe..	
+		    probe_counter = (probe_counter + 2)%(period_length/2 + 2);
+		    
+		    //for cases of 0 and 1
+		    if(probe_counter < 2){
+			probe_counter = 2;		      						
+		    }
+		 
+		    //probe time...
+		    probe_time = slot_counter + probe_counter;
+	      }else{
+	      
+		  //here is a probe node.. 
+		  if(slot_counter == probe_time){
+		    
+		    
+		    
+		  }else{		    
+		      //not an anchor not a probe.. check if there is a node
+		      //slot.. we can possibly probe.
+		      if((extra_energy_budget_counter < extra_energy_budget) && 
+			is_there_anchor(extra_energy_budget, probe_offset, )){
+			  
+		      
+		      } //....		    
+		  }
+	      }
+	    
+	  }//end of FOR LOOP....
+	
+      } //WHILE(1) termination.....
+
+      PT_END(&pt);
 }
-
-
+//=========================================================================//
+//=========================================================================//
+static void start_discovery_process(){
+    
+  
+     upper_bound_time = (period_length*period_length)/4;
+     
+     random_wait_slots = 1 + (random_rand()%upper_bound_time);
+     
+     
+     random_wait_flag    = 1;
+         
+}
 
 
 
@@ -153,10 +257,10 @@ static void packet_input(){
   //disable read flag..
   radio_read_flag  = 0;
   
-  sr_packet_t inpkt;
+  sr_packet_t *inpkt = (sr_packet_t*)packetbuf_dataptr();
   
   //copy packet to new space..
-  memcpy((void*)&inpkt, packetbuf_dataptr(), packet_len);
+  //memcpy((void*)&inpkt, packetbuf_dataptr(), packet_len);
   
   //test packet..
   
