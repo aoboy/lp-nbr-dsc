@@ -45,6 +45,7 @@ volatile char *cooja_debug_ptr;
 #endif //DEBUG
 
 ///=========================================================================/
+#define RTIMER_2_CLOCKTIMER (RTIMER_SECOND/CLOCK_SECOND)
 ///=========================================================================/
 
 ///=========================================================================/
@@ -161,8 +162,27 @@ static void sr_nodes_flush(){
             }
         }//end of while
     }
+    
+    //flush gains...
+    sr_gains_flush();
+    
     //add self
     sr_node_addself();
+}
+///=========================================================================/
+///=========================================================================/
+static void sr_nodes_update_offsets(void* node_e){
+  
+  struct sr_nodes *upd_e = (struct sr_nodes *)node_e;
+  
+  //stop update timer..
+  ctimer_stop(&upd_e->nbr_timer);
+  
+  uint16_t new_time = (upd_e->period_len*TS_LEN)/RTIMER_2_CLOCKTIMER;
+  
+  //set timer with a new time..
+  etimer_set(&upd_e->nbr_timer, new_time, sr_nodes_update_offsets, upd_e);
+  
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -175,7 +195,6 @@ static void sr_gains_update(struct sr_gains *node){
       node->offset = res->offset;
   }
 }
-
 ///=========================================================================/
 ///=========================================================================/
 uint8_t 
@@ -188,6 +207,7 @@ is_there_anchor(uint8_t topK_slots, uint16_t curr_time, uint8_t update_var){
   if(update_var){
      //1. update offsets and gains here..
      struct sr_gains *ul_ptr = list_head(srgains_list);
+     
      for(; ul_ptr != NULL; ul_ptr = list_item_next(ul_ptr)){
 	  sr_gains_update(ul_ptr);
      }
@@ -267,7 +287,21 @@ static void sr_nodes_add_nbr(linkaddr_t *src_addr,
 
       list_add(&hash_table[key].node_list, novo_nbr);
       
-      //set up timer here..
+      //add to gains list also..
+      if(hopc == 1){
+	  sr_gains_add(src_addr, offset, 0);
+      }
+      
+      //set up update timer here.. 
+      uint16_t sched_time;
+      if(offset == 0){
+	 sched_time = (novo_nbr->period_len*TS_LEN)/RTIMER_2_CLOCKTIMER;
+      }else{
+	 sched_time = (offset*TS_LEN)/RTIMER_2_CLOCKTIMER;
+      }
+      
+      ctimer_set(&novo_nbr->nbr_timer, sched_time, 
+		   sr_nodes_update_offsets, novo_nbr);
       
   }
 }

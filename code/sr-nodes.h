@@ -10,6 +10,21 @@
 #include "lib/list.h"
 #include "net/linkaddr.h"
 
+//=========================================================================//
+#define ONE_KILO 1024
+#define ONE_MSEC (RTIMER_SECOND/ONE_KILO)
+#define HALF_MSEC (ONE_MSEC/2)
+//=========================================================================//
+#define TS_LEN   (20*ONE_MSEC)
+
+#define TS_LEN_50 (TS_LEN/2)
+#define TS_LEN_25 (TS_LEN/4)
+#define TS_LEN_75 ((3*TS_LEN)/4)
+#define TS_LEN_20 (TS_LEN/5)
+#define TS_LEN_80 (4*TS_LEN_20)
+#define TS_LEN_10 (TS_LEN/10)
+#define TS_LEn_90 (10*TS_LEN_10)
+
 
 #define MAX_HOP_LIMIT 2
 //=========================================================================//
