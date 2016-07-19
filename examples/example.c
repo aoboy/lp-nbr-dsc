@@ -1,3 +1,6 @@
+/*
+This is a  very simple example application...
+*/
 #include <stdio.h>
 #include <stdlib.h>
 
