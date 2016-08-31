@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="Generator" content="Kate, the KDE Advanced Text Editor" />
+<title>sr-nodes.c</title>
+</head>
+<body>
+<pre style='color:#1f1c1b;background-color:#ffffff;'>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;contiki-conf.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;dev/leds.h&quot;</span></b>
+
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;lib/list.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;lib/memb.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;dev/watchdog.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;lib/random.h&quot;</span></b>
+<b><span style='color:#2243ff;'>/** </span></b><b><span style='color:#2243ff;'>RDC driver file</span></b><b><span style='color:#2243ff;'>*/</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;./sr-sl.h&quot;</span></b>
+<b><span style='color:#2243ff;'>/** </span></b><b><span style='color:#2243ff;'>*/</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;net/netstack.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;net/rime.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;net/linkaddr.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;sys/compower.h&quot;</span></b>
+
+
+
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;./cc2420.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;dev/serial-line.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;node-id.h&quot;</span></b>
+
+<b><span style='color:#2243ff;'>//#include &quot;./dnde-neigh-G.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;./sr-sort.h&quot;</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&quot;./sr-nodes.h&quot;</span></b>
+
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#00c000;'>#define CDEBUG 0</span></b>
+<b><span style='color:#00c000;'>#if</span></b><b><span style='color:#00c000;'> CDEBUG</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&lt;stdio.h&gt;</span></b>
+<b><span style='color:#1c49eb;'>volatile</span></b> <b><span style='color:#1c49eb;'>char</span></b> *cooja_debug_ptr;
+<b><span style='color:#00c000;'>#define COOJA_DEBUG_PRINTF(...) \</span></b>
+<b><span style='color:#00c000;'>    do{ char tmp[100]; sprintf(tmp,__VA_ARGS__); cooja_debug_ptr=tmp; } while(0);</span></b>
+<b><span style='color:#00c000;'>#else </span></b><b><span style='color:#2243ff;'>//COOJA_DEBUG_PRINTF</span></b>
+<b><span style='color:#00c000;'>#define COOJA_DEBUG_PRINTF(...)</span></b>
+<b><span style='color:#00c000;'>#endif</span></b><b><span style='color:#00c000;'> </span></b><b><span style='color:#2243ff;'>//COOJA_DEBUG_PRINTF</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#00c000;'>#define DEBUG 1</span></b>
+<b><span style='color:#00c000;'>#if</span></b><b><span style='color:#00c000;'> DEBUG</span></b>
+<b><span style='color:#00c000;'>#include </span></b><b><span style='color:#00c000;'>&lt;stdio.h&gt;</span></b>
+<b><span style='color:#00c000;'>#define PRINTF(...) printf(__VA_ARGS__)</span></b>
+<b><span style='color:#00c000;'>#else   </span></b><b><span style='color:#2243ff;'>//DEBUG</span></b>
+<b><span style='color:#00c000;'>#define PRINTF(...)</span></b>
+<b><span style='color:#00c000;'>#endif</span></b><b><span style='color:#00c000;'> </span></b><b><span style='color:#2243ff;'>//DEBUG</span></b>
+
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#00c000;'>#define RTIMER_2_CLOCKTIMER (RTIMER_SECOND/CLOCK_SECOND)</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#00c000;'>#define HASH_TABLE_SIZE 13</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b>struct</b> hash_table_t hash_table[CONF_NETWORK_SIZE];
+MEMB(srnodes_memb, <b>struct</b> sr_nodes, CONF_NETWORK_SIZE);
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+LIST(srgains_list);
+MEMB(srgains_memb, <b>struct</b> sr_gains, CONF_NETWORK_SIZE);
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>void</span></b> sr_nodes_init(){
+  <b><span style='color:#1c49eb;'>uint8_t</span></b> k;
+
+  list_init(srgains_list);
+  memb_init(&amp;srgains_memb);
+  
+  
+  <b><span style='color:#2243ff;'>//now for the hash table..</span></b>
+  memb_init(&amp;srnodes_memb);
+
+  <b>for</b>(k = <span style='color:#b08000;'>0</span>; k &lt; HASH_TABLE_SIZE; k++){
+      LIST_STRUCT_INIT(&amp;hash_table[k], node);
+  }
+
+  
+  <b><span style='color:#2243ff;'>//flush all nodes and initialize list of neighbors</span></b>
+  sr_nodes_flush();
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>uint8_t</span></b> sr_nodes_get_key(<b><span style='color:#1c49eb;'>const</span></b> linkaddr_t *addr){
+    <b><span style='color:#1c49eb;'>uint16_t</span></b> key = (addr-&gt;u8[<span style='color:#b08000;'>1</span>]&lt;&lt; <span style='color:#b08000;'>8</span>) + addr-&gt;u8[<span style='color:#b08000;'>0</span>];
+    <b>return</b> (<b><span style='color:#1c49eb;'>uint8_t</span></b>)((key%HASH_TABLE_SIZE));
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b>struct</b> sr_nodes* sr_nodes_get(<b><span style='color:#1c49eb;'>const</span></b> linkaddr_t *addr){
+    <b><span style='color:#1c49eb;'>uint8_t</span></b> key;
+    <b>struct</b> sr_nodes *lc_ptr = NULL;
+    
+    key = sr_nodes_get_key (addr);
+
+    lc_ptr = list_head(&amp;hash_table[key].node_list);
+    
+    <b>for</b>(; lc_ptr != NULL; lc_ptr = list_item_next(lc_ptr)){
+        <b>if</b>(linkaddr_cmp(&amp;lc_ptr-&gt;addr, addr)){
+            <b>return</b> lc_ptr;
+        }
+    }
+    <b>return</b> NULL;
+}
+
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b><span style='color:#1c49eb;'>void</span></b> sr_nodes_addself(){
+    <b><span style='color:#1c49eb;'>uint8_t</span></b> key;
+    <b>struct</b> sr_nodes *nself = NULL;
+
+    key = sr_nodes_get_key (&amp;linkaddr_node_addr);
+
+    nself = sr_nodes_get(&amp;linkaddr_node_addr);
+
+    <b>if</b>(nself == NULL){
+        nself = memb_alloc(&amp;srnodes_memb);
+        <b>if</b>(nself != NULL){
+            <b><span style='color:#2243ff;'>//copy own link address</span></b>
+            linkaddr_copy(&amp;nself-&gt;addr, &amp;linkaddr_node_addr);
+
+            nself-&gt;hopc        = <span style='color:#b08000;'>0</span>;
+            nself-&gt;offset      = <span style='color:#b08000;'>0</span>;
+
+            nself-&gt;slot_gain   = <span style='color:#b08000;'>0</span>;
+            nself-&gt;spat_sim    = <span style='color:#b08000;'>0</span>;
+            nself-&gt;tmp_div     = <span style='color:#b08000;'>0</span>;
+
+            nself-&gt;period_len  = sr_sl_get_period();
+
+            nself-&gt;next        = NULL;
+
+            <b><span style='color:#2243ff;'>//add to list</span></b>
+            list_add(&amp;hash_table[key].node_list, nself);
+        }
+    }<b><span style='color:#2243ff;'>//nself == NULL</span></b>
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b><span style='color:#1c49eb;'>void</span></b> sr_gains_flush(){
+  
+  <b>struct</b> sr_gains *lg =list_head(srgains_list);
+  
+  <b>while</b>(lg != NULL){	
+      list_remove(srgains_list, lg);
+      memb_remove(&amp;srgains_memb, lg);    
+  }
+  
+  <b><span style='color:#2243ff;'>//add self..</span></b>
+  sr_gains_add(&amp;linkaddr_node_addr, <span style='color:#b08000;'>0</span>, <span style='color:#b08000;'>0</span>);
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b><span style='color:#1c49eb;'>void</span></b> sr_nodes_flush(){
+    <b><span style='color:#1c49eb;'>uint8_t</span></b> key;
+    <b>struct</b> sr_nodes *nfls = NULL;
+
+    <b>for</b>( k = <span style='color:#b08000;'>0</span>; k &lt; HASH_TABLE_SIZE; key++){
+
+        <b>while</b>(<span style='color:#b08000;'>1</span>){
+            nfls = list_pop(&amp;hash_table[key].node_list);
+            <b>if</b>(nfls != NULL){
+                list_remove(&amp;hash_table[key].node_list, nfls);
+                memb_remove(&amp;srnodes_memb, nfls);
+            }<b>else</b>{
+                <b><span style='color:#2243ff;'>//exit loop</span></b>
+                <b>break</b>;
+            }
+        }<b><span style='color:#2243ff;'>//end of while</span></b>
+    }
+    
+    <b><span style='color:#2243ff;'>//flush gains...</span></b>
+    sr_gains_flush();
+    
+    <b><span style='color:#2243ff;'>//add self</span></b>
+    sr_node_addself();
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b><span style='color:#1c49eb;'>void</span></b> sr_nodes_update_offsets(<b><span style='color:#1c49eb;'>void</span></b>* node_e){
+  
+  <b>struct</b> sr_nodes *upd_e = (<b>struct</b> sr_nodes *)node_e;
+  
+  <b><span style='color:#2243ff;'>//stop update timer..</span></b>
+  ctimer_stop(&amp;upd_e-&gt;nbr_timer);
+  
+  <b><span style='color:#1c49eb;'>uint16_t</span></b> new_time = (upd_e-&gt;period_len*TS_LEN)/RTIMER_2_CLOCKTIMER;
+  
+  <b><span style='color:#2243ff;'>//set timer with a new time..</span></b>
+  etimer_set(&amp;upd_e-&gt;nbr_timer, new_time, sr_nodes_update_offsets, upd_e);
+  
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b><span style='color:#1c49eb;'>void</span></b> sr_gains_update(<b>struct</b> sr_gains *node){
+
+  <b>struct</b> sr_nodes* res = sr_nodes_get(&amp;node-&gt;addr);
+  
+  <b>if</b>(res != NULL){
+      node-&gt;gains  = res-&gt;slot_gain;
+      node-&gt;offset = res-&gt;offset;
+  }
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>uint8_t</span></b> 
+is_there_anchor(<b><span style='color:#1c49eb;'>uint8_t</span></b> topK_slots, <b><span style='color:#1c49eb;'>uint16_t</span></b> curr_time, <b><span style='color:#1c49eb;'>uint8_t</span></b> update_var){
+  <b><span style='color:#2243ff;'>/**1</span></b><b><span style='color:#2243ff;'>. update offsets and gains</span></b>
+<b><span style='color:#2243ff;'>     2. sort gains</span></b>
+<b><span style='color:#2243ff;'>     3. extract the K leading gains</span></b>
+<b><span style='color:#2243ff;'>     4. </span></b>
+<b><span style='color:#2243ff;'>   </span></b><b><span style='color:#2243ff;'>*/</span></b>
+  <b>if</b>(update_var){
+     <b><span style='color:#2243ff;'>//1. update offsets and gains here..</span></b>
+     <b>struct</b> sr_gains *ul_ptr = list_head(srgains_list);
+     
+     <b>for</b>(; ul_ptr != NULL; ul_ptr = list_item_next(ul_ptr)){
+	  sr_gains_update(ul_ptr);
+     }
+    
+     <b><span style='color:#2243ff;'>//2. sort the gains here</span></b>
+     <b>struct</b> sr_gains *hlist = list_head(srgains_list);
+     
+     <b><span style='color:#2243ff;'>//call the sorting method here</span></b>
+     sr_insertion_sort(&amp;hlist);
+  }
+  
+  <b><span style='color:#1c49eb;'>uint8_t</span></b> k_max = <span style='color:#b08000;'>0</span>;
+  <b>struct</b> sr_gains *hptr = list_head(srgains_list);
+  
+  <b>for</b>(; (hptr != NULL) &amp;&amp; (k_max &lt; topK_slots); hptr=list_item_next(hptr)){
+    
+     <b><span style='color:#2243ff;'>//find an entry whose offset is equal to mine.</span></b>
+     <b><span style='color:#1c49eb;'>uint16_t</span></b> time_anchor = sr_nodes_time_anchor(hptr);
+  } 
+  
+  <b>return</b> <span style='color:#b08000;'>0</span>;
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b><span style='color:#1c49eb;'>void</span></b> sr_gains_add(linkaddr_t *addr, <b><span style='color:#1c49eb;'>uint8_t</span></b> offset, <b><span style='color:#1c49eb;'>uint16_t</span></b> gain){
+  <b>struct</b> sr_gains *nnode = list_head(srgains_list);
+  
+  <b>for</b>(; nnode != NULL; nnode = list_item_next(nnode)){
+      <b>if</b>(linkaddr_cmp(nnode-&gt;addr, addr)){
+	  <b><span style='color:#2243ff;'>//it is an update.. </span></b>
+	  nnode-&gt;offset = offset;
+	  nnode-&gt;gains  = gain;
+	  <b>return</b>;
+      }
+  }<b><span style='color:#2243ff;'>//end for loop</span></b>
+  
+  <b><span style='color:#2243ff;'>//create a new list element   </span></b>
+  nnode = memb_alloc(&amp;srgains_memb);
+  
+  <b>if</b>(nnode != NULL){
+      nnode-&gt;gains   = gain;
+      nnode-&gt;offset  = offset;
+      nnode-&gt;next    = NULL;
+      linkaddr_copy(&amp;nnode-&gt;addr, addr);
+      
+      <b><span style='color:#2243ff;'>//add new sort element.. </span></b>
+      list_add(srgains_list);
+  }
+  
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b><span style='color:#1c49eb;'>void</span></b> sr_nodes_add_nbr(linkaddr_t *src_addr, 
+                             <b><span style='color:#1c49eb;'>uint8_t</span></b>     offset,
+			     <b><span style='color:#1c49eb;'>uint8_t</span></b>     period_len,
+			     <b><span style='color:#1c49eb;'>uint8_t</span></b>     hopc
+){
+  
+  <b><span style='color:#1c49eb;'>uint8_t</span></b> key;
+  <b>struct</b> sr_nodes *novo_nbr = NULL;
+  
+  novo_nbr = memb_alloc(&amp;srnodes_memb);
+  
+  <b>if</b>(novo_nbr != NULL){
+      novo_nbr-&gt;hopc       = hopc;
+      novo_nbr-&gt;offset     = offset;
+      novo_nbr-&gt;period_len = period_len;
+      
+      novo_nbr-&gt;tmp_div    = <span style='color:#b08000;'>0</span>;
+      novo_nbr-&gt;spat_sim   = <span style='color:#b08000;'>0</span>;
+      novo_nbr-&gt;slot_gain  = <span style='color:#b08000;'>0</span>;
+      <b><span style='color:#2243ff;'>//copy address</span></b>
+      linkaddr_copy(&amp;novo_nbr-&gt;addr, src_addr);
+      
+      novo_nbr-&gt;next = NULL;
+      
+      <b><span style='color:#2243ff;'>//get hash KEY</span></b>
+      key = sr_nodes_get_key (src_addr);
+
+      list_add(&amp;hash_table[key].node_list, novo_nbr);
+      
+      <b><span style='color:#2243ff;'>//add to gains list also..</span></b>
+      <b>if</b>(hopc == <span style='color:#b08000;'>1</span>){
+	  sr_gains_add(src_addr, offset, <span style='color:#b08000;'>0</span>);
+      }
+      
+      <b><span style='color:#2243ff;'>//set up update timer here.. </span></b>
+      <b><span style='color:#1c49eb;'>uint16_t</span></b> sched_time;
+      <b>if</b>(offset == <span style='color:#b08000;'>0</span>){
+	 sched_time = (novo_nbr-&gt;period_len*TS_LEN)/RTIMER_2_CLOCKTIMER;
+      }<b>else</b>{
+	 sched_time = (offset*TS_LEN)/RTIMER_2_CLOCKTIMER;
+      }
+      
+      ctimer_set(&amp;novo_nbr-&gt;nbr_timer, sched_time, 
+		   sr_nodes_update_offsets, novo_nbr);
+      
+  }
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>static</span></b> <b><span style='color:#1c49eb;'>void</span></b> sr_node_nbr_update(<b>struct</b> sr_nodes *nd_ptr,
+                             <b><span style='color:#1c49eb;'>uint8_t</span></b>     offset,
+			     <b><span style='color:#1c49eb;'>uint8_t</span></b>     hopc){
+
+  <b>if</b>(nd_ptr != NULL){
+      nd_ptr-&gt;offset     = offset;
+      nd_ptr-&gt;hopc       = hopc;
+
+      <b>if</b>(hopc == <span style='color:#b08000;'>1</span>){
+	 <b><span style='color:#2243ff;'>//trigger update timer here..</span></b>
+      }
+  }
+}			       
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>void</span></b> 
+sr_nodes_add_nbrs(sr_packet_t *pkt, <b><span style='color:#1c49eb;'>uint8_t</span></b> pld_len, <b><span style='color:#1c49eb;'>uint8_t</span></b> probe_offset){
+    <b><span style='color:#1c49eb;'>uint8_t</span></b> spat_sim = <span style='color:#b08000;'>1</span>, k = <span style='color:#b08000;'>0</span>, offset_h1 = <span style='color:#b08000;'>0</span>, offset_h2 = <span style='color:#b08000;'>0</span>;
+
+    <b><span style='color:#2243ff;'>//compute offset H1 here...</span></b>
+    <b>if</b>((probe_offset - pkt-&gt;offset)){
+
+    }
+    
+    
+    <b>struct</b> sr_nodes node = sr_nodes_get(&amp;pkt-&gt;src_addr);
+    
+    <b>if</b>(node != NULL){
+        <b><span style='color:#2243ff;'>//update neighbor here</span></b>
+        sr_node_nbr_update(node, offset_h1, <span style='color:#b08000;'>1</span>);
+
+        <b><span style='color:#2243ff;'>//update spatial similarity</span></b>
+        spat_sim++;
+    }<b>else</b>{
+        <b><span style='color:#2243ff;'>//add a new 1 hop neighbor here..</span></b>
+        sr_nodes_add_nbr(&amp;pkt-&gt;src_addr, offset_h1, pkt-&gt;period_len, <span style='color:#b08000;'>1</span>);
+    }
+    
+    <b><span style='color:#2243ff;'>//now go over the packet payload and add every node if does not exist yet</span></b>
+    <b>for</b>(k = <span style='color:#b08000;'>0</span>; k &lt; pld_len; k++){
+        <b><span style='color:#1c49eb;'>uint8_t</span></b> dpos = k*SR_DATA_LEN;
+        sr_data_t *sr_item = (sr_data_t*)(&amp;pkt-&gt;data[dpos]);
+
+        <b>if</b>((!linkaddr_cmp(&amp;sr_item-&gt;addr, &amp;linkaddr_null)) &amp;&amp;
+                (!linkaddr_cmp(&amp;sr_item-&gt;addr, &amp;linkaddr_node_addr))){
+
+            <b>struct</b> sr_nodes *sr_node = sr_nodes_get(&amp;sr_item-&gt;addr);
+
+            <b>if</b>(sr_node != NULL){
+                <b><span style='color:#2243ff;'>//increment spatial similarity..</span></b>
+                spat_sim++;
+            }<b>else</b>{
+                <b><span style='color:#2243ff;'>/*</span></b><b><span style='color:#2243ff;'>we have an unknown 2hop^* neighbor, add it</span></b>
+<b><span style='color:#2243ff;'>                1. compute node H2 offset,</span></b>
+<b><span style='color:#2243ff;'>                2. add neighbor</span></b><b><span style='color:#2243ff;'>*/</span></b>
+
+
+                <b><span style='color:#2243ff;'>//2.here we add the neighbor..</span></b>
+                sr_nodes_add_nbr(&amp;sr_item-&gt;addr, offset_h2, sr_item-&gt;period_len, <span style='color:#b08000;'>2</span>);
+            }
+        }
+    }
+
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#1c49eb;'>uint8_t</span></b> sr_nodes_add_data(<b><span style='color:#1c49eb;'>uint8_t</span></b> *data_ptr, <b><span style='color:#1c49eb;'>uint8_t</span></b> offset){
+  <b><span style='color:#1c49eb;'>uint8_t</span></b> off_ptr = <span style='color:#b08000;'>0</span>, key;
+  
+  <b>struct</b> sr_nodes *lst_ptr = NULL;
+  
+  <b>for</b>(key = <span style='color:#b08000;'>0</span>; key &lt; HASH_TABLE_SIZE; key++){
+      <b><span style='color:#1c49eb;'>uint8_t</span></b> exit_loop = <span style='color:#b08000;'>0</span>;
+      
+      lst_ptr = list_head(&amp;hash_table[key].node_list);
+
+      <b>while</b>(lst_ptr != NULL){
+          <b>if</b>((lst_ptr-&gt;hopc &lt; MAX_HOP_LIMIT)
+                  &amp;&amp; (!linkaddr_cmp(&amp;lst_ptr-&gt;addr, &amp;linkaddr_node_addr))
+                  &amp;&amp;(!linkaddr_cmp(&amp;lst_ptr-&gt;addr, &amp;linkaddr_null))){
+
+              <b><span style='color:#2243ff;'>//fill in the payload..</span></b>
+              sr_data_t *d2s  = (sr_data_t*)(&amp;data_ptr[off_ptr]);
+
+              d2s-&gt;hopcount   = lst_ptr-&gt;hopc + <span style='color:#b08000;'>1</span>;
+              d2s-&gt;offset     = lst_ptr-&gt;offset;
+              d2s-&gt;period_len = lst_ptr-&gt;period_len;
+
+              linkaddr_copy(&amp;d2s-&gt;addr, &amp;lst_ptr-&gt;addr);
+
+              off_ptr = off_ptr + SR_DATA_LEN;
+
+              <b>if</b>(off_ptr &gt;= NETWORK_PAYLOAD_SIZE){
+                  exit_loop = <span style='color:#b08000;'>1</span>;
+                  <b>break</b>;
+              }
+          } <b><span style='color:#2243ff;'>//end of IF</span></b>
+
+          <b><span style='color:#2243ff;'>//get next element in the list</span></b>
+          lst_ptr = list_item_next(lst_ptr);
+      }<b><span style='color:#2243ff;'>//end while..</span></b>
+
+      <b>if</b>(exit_loop){
+          <b>break</b>;
+      }
+  }
+
+  <b>if</b>(off_ptr &gt; NETWORK_PAYLOAD_SIZE){
+      off_ptr = NETWORK_PAYLOAD_SIZE;
+  }
+  
+  <b>return</b> off_ptr;
+}
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+<b><span style='color:#2243ff;'>///=========================================================================/</span></b>
+</pre>
+</body>
+</html>

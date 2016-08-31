@@ -386,7 +386,7 @@ uint8_t sr_nodes_add_data(uint8_t *data_ptr, uint8_t offset){
       while(lst_ptr != NULL){
           if((lst_ptr->hopc < MAX_HOP_LIMIT)
                   && (!linkaddr_cmp(&lst_ptr->addr, &linkaddr_node_addr))
-                  &&(!linkaddr_cmp(&lst_ptr->addr, &linkaddr_null))){
+                  && (!linkaddr_cmp(&lst_ptr->addr, &linkaddr_null))){
 
               //fill in the payload..
               sr_data_t *d2s  = (sr_data_t*)(&data_ptr[off_ptr]);

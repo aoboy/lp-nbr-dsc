@@ -83,7 +83,7 @@ static const uint8_t extra_energy = EXTRA_ENERGY;
 static const uint8_t extra_energy = 5; //in case not defined,.. we use 5%
 #endif // EXTRA_ENERGY
 static volatile uint8_t 		 extra_energy_K   = extra_energy;
-static volatile uint8_t 	 extra_energy_K_counter   = 0;
+static volatile uint8_t 	 		extra_energy_K_counter   = 0;
 
 static volatile uint16_t 		      upper_bound_time = 0;
 //=========================================================================//
@@ -455,7 +455,7 @@ static void packet_input(){
   //copy packet to new space..
   //memcpy((void*)&inpkt, packetbuf_dataptr(), packet_len);
   
-  //test packet..
+  //test packet.. 
   
   
   
