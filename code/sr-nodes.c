@@ -273,7 +273,8 @@ static void sr_nodes_add_nbr(linkaddr_t *src_addr,
       novo_nbr->hopc       = hopc;
       novo_nbr->offset     = offset;
       novo_nbr->period_len = period_len;
-      
+
+      //just to add a comment here...
       novo_nbr->tmp_div    = 0;
       novo_nbr->spat_sim   = 0;
       novo_nbr->slot_gain  = 0;
